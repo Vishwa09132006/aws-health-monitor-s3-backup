@@ -1,0 +1,1 @@
+Git does not track empty directories so we use .gitkeep so our log directory can be tracked by GitHub in our repository
