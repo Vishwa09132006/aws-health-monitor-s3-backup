@@ -1,81 +1,72 @@
 #!/bin/bash
 
-# ─── S3 Backup Script ─────────────────────────────────────
-# Compresses health_monitor.sh and uploads it to S3
-# Also uploads the health log to S3
-# ──────────────────────────────────────────────────────────
+# ─── Health Monitor + S3 Backup Pipeline ─────────────────
+# 1. Runs health monitor and uploads log to S3 every run
+# 2. Only backs up health_monitor.sh to S3 if it changed
+# Scheduled monthly with cron
+# ──────────────────────────────────────────────────────
 
 # Config
-HEALTH_SCRIPT=~/bash_scripts/health_monitor.sh
-HEALTH_LOG=~/bash_scripts/logs/health.log
+SCRIPT_DIR=~/projects/aws-health-monitor-s3-backup/scripts
+LOG_DIR=~/projects/aws-health-monitor-s3-backup/logs
 BUCKET="vp-cloud-backups-2026"
-TIMESTAMP=$(date +"%Y-%m-%d_%H-%M")
-BACKUP_FILE="/tmp/health_monitor_$TIMESTAMP.tar.gz"
-LOG_FILE=~/bash_scripts/logs/s3_backup.log
+TIMESTAMP=$(date +"%Y-%m-%d")
+CHECKSUM_FILE=$LOG_DIR/health_monitor.md5
+LOG_FILE=$LOG_DIR/health.log
 
-mkdir -p ~/bash_scripts/logs
+mkdir -p $LOG_DIR
 
 echo "=============================="
-echo " S3 Backup Script"
+echo " Health Monitor + S3 Backup"
 echo " $(date)"
 echo "=============================="
 
-# ── Step 1: Compress health_monitor.sh ──
+# ── Step 1: Run health monitor ──
 echo ""
-echo "Compressing health_monitor.sh..."
-tar -czf $BACKUP_FILE $HEALTH_SCRIPT 2>/dev/null
+echo "Running health monitor..."
+bash $SCRIPT_DIR/health_monitor.sh
+echo "Health monitor complete"
+
+# ── Step 2: Upload health log to S3 ──
+echo ""
+echo "Uploading health log to S3..."
+aws s3 cp $LOG_FILE s3://$BUCKET/health-reports/health_$TIMESTAMP.log
 
 if [ $? -eq 0 ]; then
-  size=$(du -sh $BACKUP_FILE | awk '{print $1}')
-  echo "  OK: Compressed — $BACKUP_FILE ($size)"
+  echo "  OK: health log uploaded to s3://$BUCKET/health-reports/"
 else
-  echo "  ERROR: Compression failed"
-  echo "$(date) | ERROR | Compression failed" >> $LOG_FILE
-  exit 1
+  echo "  ERROR: health log upload failed"
 fi
 
-# ── Step 2: Upload compressed script to S3 ──
+# ── Step 3: Check if health_monitor.sh changed ──
 echo ""
-echo "Uploading health_monitor.sh to S3..."
-aws s3 cp $BACKUP_FILE s3://$BUCKET/backups/
+echo "Checking if health_monitor.sh changed..."
 
-if [ $? -eq 0 ]; then
-  echo "  OK: Uploaded to s3://$BUCKET/backups/"
-  echo "$(date) | OK | Uploaded $BACKUP_FILE to s3://$BUCKET/backups/" >> $LOG_FILE
+current_checksum=$(md5sum $SCRIPT_DIR/health_monitor.sh | awk '{print $1}')
+last_checksum=$(cat $CHECKSUM_FILE 2>/dev/null)
+
+if [ "$current_checksum" == "$last_checksum" ]; then
+  echo "  health_monitor.sh unchanged — skipping S3 backup"
 else
-  echo "  ERROR: Upload failed"
-  echo "$(date) | ERROR | Upload failed for $BACKUP_FILE" >> $LOG_FILE
-  exit 1
+  echo "  health_monitor.sh changed — backing up to S3..."
+  BACKUP_FILE="/tmp/health_monitor_$TIMESTAMP.tar.gz"
+  tar -czf $BACKUP_FILE $SCRIPT_DIR/health_monitor.sh 2>/dev/null
+
+  aws s3 cp $BACKUP_FILE s3://$BUCKET/scripts/
+
+  if [ $? -eq 0 ]; then
+    echo "  OK: health_monitor.sh backed up to s3://$BUCKET/scripts/"
+    echo $current_checksum > $CHECKSUM_FILE
+    echo "  Checksum updated"
+  else
+    echo "  ERROR: script backup failed"
+  fi
+
+  rm -f $BACKUP_FILE
 fi
-
-# ── Step 3: Upload health log to S3 ──
-echo ""
-echo "Uploading health.log to S3..."
-aws s3 cp $HEALTH_LOG s3://$BUCKET/logs/health.log
-
-if [ $? -eq 0 ]; then
-  echo "  OK: health.log uploaded to s3://$BUCKET/logs/"
-  echo "$(date) | OK | Uploaded health.log to s3://$BUCKET/logs/" >> $LOG_FILE
-else
-  echo "  ERROR: Log upload failed"
-  echo "$(date) | ERROR | health.log upload failed" >> $LOG_FILE
-  exit 1
-fi
-
-# ── Step 4: Clean up local temp file ──
-rm $BACKUP_FILE
-echo ""
-echo "  Cleaned up local temp file"
-
-# ── Step 5: Show current S3 contents ──
-echo ""
-echo "Current backups in S3:"
-aws s3 ls s3://$BUCKET/backups/
-echo ""
-echo "Current logs in S3:"
-aws s3 ls s3://$BUCKET/logs/
 
 echo ""
 echo "=============================="
-echo " Backup Complete"
+echo " Pipeline Complete"
+echo " $(date)"
 echo "=============================="
