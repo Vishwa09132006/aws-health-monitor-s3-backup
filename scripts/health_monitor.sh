@@ -11,7 +11,7 @@ MEMORY_WARN=75
 CPU_WARN=80
 
 # Log file
-LOG_FILE=~/bash_scripts/logs/health.log
+LOG_FILE=~/projects/aws-health-monitor-s3-backup/logs/health.log
 
 echo "==================================="
 echo "      System Health Monitor        "
