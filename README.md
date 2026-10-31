@@ -59,34 +59,7 @@ back up uploaded
 ---
 
 ## Sample output
-
-```
-==============================
-Health Monitor + S3 Backup
-==============================
-
-Running health monitor...
-
-Disk Usage: 1%
-OK: Disk Usage is 1%, which is 79% below the threshold.
-
-Memory Usage: 11%
-OK: Memory Usage is 11%, which is 64% below the threshold.
-
-CPU Usage: 0%
-OK: CPU Usage is 0%, which is 80% below the threshold.
-
-Uploading health log to S3...
-OK: health log uploaded to s3://<bucket>/health-reports/
-
-Checking if health_monitor.sh changed...
-health_monitor.sh unchanged — skipping S3 backup
-
-==============================
-Pipeline Complete
-==============================
-```
-
+![](images/script-output.png)
 ---
 
 ## What ends up in S3
