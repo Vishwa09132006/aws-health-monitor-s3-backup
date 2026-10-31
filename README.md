@@ -4,7 +4,7 @@ An automated bash pipeline that checks a server's health, archives the results t
 
 ### ▶️ Watch the demo
 
-**[Full video walkthrough on YouTube](YOUR_YOUTUBE_LINK_HERE)**
+**[coming soon...]()**
 
 The video shows the whole pipeline running live on an AWS EC2 instance, from SSH and file transfer through the S3 upload and cron setup.
 
